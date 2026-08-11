@@ -66,7 +66,13 @@ app.get("/api/download-teams-app", (req, res) => {
 // Text translation API (REST fallback for quick phrase translation)
 app.post("/api/translate/text", async (req, res) => {
   try {
-    const { text, sourceLang, targetLang, context } = req.body;
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({
+        error: "GEMINI_API_KEY environment variable is not configured on Vercel. Please set GEMINI_API_KEY in Vercel project settings.",
+      });
+    }
+
+    const { text, sourceLang, targetLang } = req.body;
     if (!text) {
       return res.status(400).json({ error: "Text is required" });
     }
@@ -75,11 +81,11 @@ app.post("/api/translate/text", async (req, res) => {
     const targetLabel = LANG_MAP[targetLang]?.name || "English";
 
     const prompt = `Translate the following speech transcript from ${sourceLabel} to natural, conversational ${targetLabel}.
-Maintain the speaker's context, tone, and intent. If technical terms like 'Salesforce', 'API', 'Zoom', 'process' are present, handle them naturally in colloquial language.
+Maintain the speaker's context, tone, and intent.
 
 Input text: "${text}"
 
-Return JSON matching:
+Return JSON matching strictly:
 {
   "translatedText": "the translated string",
   "detectedSourceLang": "${sourceLang || "auto"}",
@@ -89,13 +95,18 @@ Return JSON matching:
     const response = await ai.models.generateContent({
       model: "gemini-3.6-flash",
       contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-      },
     });
 
-    const jsonText = response.text || "{}";
-    const result = JSON.parse(jsonText);
+    const rawText = (response.text || "").trim();
+    const cleanedText = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+
+    let result = { translatedText: "", detectedSourceLang: sourceLang || "auto" };
+    try {
+      result = JSON.parse(cleanedText);
+    } catch {
+      result = { translatedText: cleanedText, detectedSourceLang: sourceLang || "auto" };
+    }
+
     res.json(result);
   } catch (error: any) {
     console.error("Text translation error:", error);
@@ -162,13 +173,19 @@ function pcm16ToWavBuffer(pcmBuffer: Buffer, sampleRate = 16000): Buffer {
 
 app.post("/api/translate/audio", async (req, res) => {
   try {
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({
+        error: "GEMINI_API_KEY environment variable is not configured on Vercel. Please set GEMINI_API_KEY in Vercel project settings.",
+      });
+    }
+
     const { audio, sourceLang, targetLang } = req.body;
     if (!audio) {
       return res.status(400).json({ error: "Audio data is required" });
     }
 
     const rawBuffer = Buffer.from(audio, "base64");
-    if (rawBuffer.length < 50) {
+    if (rawBuffer.length < 100) {
       return res.json({ sourceText: "", translatedText: "", audio: null });
     }
 
@@ -179,12 +196,12 @@ app.post("/api/translate/audio", async (req, res) => {
     const targetLangInfo = LANG_MAP[targetLang] || LANG_MAP["hi"];
     const targetLangName = targetLangInfo.name;
 
-    const prompt = `You are a real-time speech interpreter. Listen to this input audio clip carefully. Translate what was spoken directly into ${targetLangName}. 
-Return JSON matching strictly:
-{
-  "sourceText": "transcription of what was spoken",
-  "translatedText": "the translated speech in ${targetLangName}"
-}`;
+    const prompt = `You are a real-time speech interpreter and translator. 
+Listen to this audio clip. 
+1. Transcribe the spoken text in its original language.
+2. Translate the spoken text accurately into ${targetLangName}.
+Return ONLY a valid JSON object strictly matching this format without any surrounding markdown code block:
+{"sourceText": "transcription here", "translatedText": "translation in ${targetLangName} here"}`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3.6-flash",
@@ -197,40 +214,48 @@ Return JSON matching strictly:
         },
         { text: prompt },
       ],
-      config: {
-        responseMimeType: "application/json",
-      },
     });
 
-    const jsonText = response.text || "{}";
+    const rawText = (response.text || "").trim();
+    const cleanedText = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+
     let result = { sourceText: "", translatedText: "" };
     try {
-      result = JSON.parse(jsonText);
+      result = JSON.parse(cleanedText);
     } catch {
-      result.translatedText = response.text || "";
+      if (cleanedText) {
+        result = { sourceText: "Spoken audio clip", translatedText: cleanedText };
+      }
+    }
+
+    if (!result.translatedText || result.translatedText.toLowerCase().includes("no speech")) {
+      return res.json({
+        sourceText: "",
+        translatedText: "",
+        audio: null,
+        message: "No clear speech detected",
+      });
     }
 
     // Synthesize TTS audio for output
     let base64TTS = null;
-    if (result.translatedText) {
-      try {
-        const ttsPrompt = `Speak cleanly in ${targetLangName}: ${result.translatedText}`;
-        const ttsResponse = await ai.models.generateContent({
-          model: "gemini-3.1-flash-tts-preview",
-          contents: [{ parts: [{ text: ttsPrompt }] }],
-          config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: targetLangInfo.voice },
-              },
+    try {
+      const ttsPrompt = `Speak cleanly in ${targetLangName}: ${result.translatedText}`;
+      const ttsResponse = await ai.models.generateContent({
+        model: "gemini-3.1-flash-tts-preview",
+        contents: [{ parts: [{ text: ttsPrompt }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: targetLangInfo.voice },
             },
           },
-        });
-        base64TTS = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
-      } catch (e) {
-        console.warn("TTS fallback generation warning:", e);
-      }
+        },
+      });
+      base64TTS = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
+    } catch (e) {
+      console.warn("TTS generation warning:", e);
     }
 
     res.json({

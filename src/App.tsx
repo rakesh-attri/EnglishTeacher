@@ -83,10 +83,10 @@ export default function App() {
 
   // Process Serverless REST Audio Chunk
   const sendRestAudioChunk = useCallback(async (base64Audio: string) => {
-    if (isProcessingRestAudioRef.current || !base64Audio) return;
+    if (!base64Audio || isProcessingRestAudioRef.current) return;
     isProcessingRestAudioRef.current = true;
     try {
-      setStatusMessage("⚡ Serverless Mode: Translating voice clip...");
+      setStatusMessage("⚡ Processing voice translation...");
       const res = await fetch("/api/translate/audio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -98,7 +98,11 @@ export default function App() {
       });
 
       const data = await res.json();
-      if (res.ok && data.translatedText) {
+
+      if (!res.ok || data.error) {
+        setStatus("error");
+        setStatusMessage(`⚠️ API Error: ${data.error || "Translation failed"}`);
+      } else if (data.translatedText) {
         const turnId = "turn-rest-" + Date.now();
         const newTurn: TranslationTurn = {
           id: turnId,
@@ -123,14 +127,17 @@ export default function App() {
           setStatus("listening");
           setStatusMessage("🎙️ Serverless Voice Mode active. Speak into mic...");
         }, 2000);
+      } else if (data.message) {
+        setStatus("listening");
+        setStatusMessage(`🎙️ ${data.message}. Speak into mic...`);
       } else {
         setStatus("listening");
         setStatusMessage("🎙️ Serverless Voice Mode active. Speak into mic...");
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("REST Audio translation error:", e);
-      setStatus("listening");
-      setStatusMessage("🎙️ Serverless Voice Mode active. Speak into mic...");
+      setStatus("error");
+      setStatusMessage("Failed to translate audio: " + (e.message || "Network error"));
     } finally {
       isProcessingRestAudioRef.current = false;
     }
@@ -275,9 +282,10 @@ export default function App() {
           }
         };
 
-        // Start PCM Stream Recorder
+        // Start PCM Stream Recorder with Voice Activity Detection (VAD)
         let pcmAccumulator: string[] = [];
-        let chunkTimer: any = null;
+        let silenceCount = 0;
+        let speechActive = false;
 
         const recorder = new PCMStreamRecorder((base64PCM, vol) => {
           setInputVolume(vol);
@@ -290,19 +298,34 @@ export default function App() {
               })
             );
           } else {
-            // REST Fallback accumulation: collect audio chunks every 2.5 seconds
-            pcmAccumulator.push(base64PCM);
-            if (!chunkTimer) {
-              chunkTimer = setTimeout(() => {
-                if (pcmAccumulator.length > 0) {
-                  const combinedPCM = mergeBase64PCMChunks(pcmAccumulator);
-                  pcmAccumulator = [];
-                  if (combinedPCM) {
-                    sendRestAudioChunk(combinedPCM);
-                  }
-                }
-                chunkTimer = null;
-              }, 2500);
+            // REST Fallback Voice Activity Detection (VAD)
+            const isSpeaking = vol > 0.03;
+
+            if (isSpeaking) {
+              speechActive = true;
+              silenceCount = 0;
+              pcmAccumulator.push(base64PCM);
+            } else if (speechActive) {
+              pcmAccumulator.push(base64PCM);
+              silenceCount++;
+            }
+
+            // Trigger translation when user pauses (silence > 8 chunks ~800ms) or clip reaches ~3.5 seconds
+            const hasPause = speechActive && silenceCount >= 8;
+            const isMaxLength = pcmAccumulator.length >= 35;
+
+            if ((hasPause || isMaxLength) && pcmAccumulator.length >= 8) {
+              const combinedPCM = mergeBase64PCMChunks(pcmAccumulator);
+              pcmAccumulator = [];
+              speechActive = false;
+              silenceCount = 0;
+
+              if (combinedPCM) {
+                sendRestAudioChunk(combinedPCM);
+              }
+            } else if (!speechActive && pcmAccumulator.length > 0) {
+              // Reset empty noise buffer
+              pcmAccumulator = [];
             }
           }
         });
