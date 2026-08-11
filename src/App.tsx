@@ -16,7 +16,7 @@ import {
   TranslationTurn,
   ConnectionStatus,
 } from "./types";
-import { PCMStreamRecorder, PCMAudioQueuePlayer } from "./utils/pcmAudio";
+import { PCMStreamRecorder, PCMAudioQueuePlayer, mergeBase64PCMChunks } from "./utils/pcmAudio";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("studio");
@@ -121,10 +121,16 @@ export default function App() {
 
         setTimeout(() => {
           setStatus("listening");
-        }, 1500);
+          setStatusMessage("🎙️ Serverless Voice Mode active. Speak into mic...");
+        }, 2000);
+      } else {
+        setStatus("listening");
+        setStatusMessage("🎙️ Serverless Voice Mode active. Speak into mic...");
       }
     } catch (e) {
       console.error("REST Audio translation error:", e);
+      setStatus("listening");
+      setStatusMessage("🎙️ Serverless Voice Mode active. Speak into mic...");
     } finally {
       isProcessingRestAudioRef.current = false;
     }
@@ -284,14 +290,16 @@ export default function App() {
               })
             );
           } else {
-            // REST Fallback accumulation: collect audio chunks every 3 seconds
+            // REST Fallback accumulation: collect audio chunks every 2.5 seconds
             pcmAccumulator.push(base64PCM);
-            if (vol > 0.15 && !chunkTimer) {
+            if (!chunkTimer) {
               chunkTimer = setTimeout(() => {
                 if (pcmAccumulator.length > 0) {
-                  const combinedPCM = pcmAccumulator.join("");
+                  const combinedPCM = mergeBase64PCMChunks(pcmAccumulator);
                   pcmAccumulator = [];
-                  sendRestAudioChunk(combinedPCM);
+                  if (combinedPCM) {
+                    sendRestAudioChunk(combinedPCM);
+                  }
                 }
                 chunkTimer = null;
               }, 2500);

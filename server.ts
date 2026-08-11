@@ -141,12 +141,40 @@ app.post("/api/translate/tts", async (req, res) => {
 });
 
 // Audio REST Translation API (Fallback for Vercel & serverless environments without persistent WebSockets)
+function pcm16ToWavBuffer(pcmBuffer: Buffer, sampleRate = 16000): Buffer {
+  const wavHeader = Buffer.alloc(44);
+  wavHeader.write("RIFF", 0);
+  wavHeader.writeUInt32LE(36 + pcmBuffer.length, 4);
+  wavHeader.write("WAVE", 8);
+  wavHeader.write("fmt ", 12);
+  wavHeader.writeUInt32LE(16, 16);
+  wavHeader.writeUInt16LE(1, 20);
+  wavHeader.writeUInt16LE(1, 22);
+  wavHeader.writeUInt32LE(sampleRate, 24);
+  wavHeader.writeUInt32LE(sampleRate * 2, 28);
+  wavHeader.writeUInt16LE(2, 32);
+  wavHeader.writeUInt16LE(16, 34);
+  wavHeader.write("data", 36);
+  wavHeader.writeUInt32LE(pcmBuffer.length, 40);
+
+  return Buffer.concat([wavHeader, pcmBuffer]);
+}
+
 app.post("/api/translate/audio", async (req, res) => {
   try {
-    const { audio, mimeType, sourceLang, targetLang } = req.body;
+    const { audio, sourceLang, targetLang } = req.body;
     if (!audio) {
       return res.status(400).json({ error: "Audio data is required" });
     }
+
+    const rawBuffer = Buffer.from(audio, "base64");
+    if (rawBuffer.length < 50) {
+      return res.json({ sourceText: "", translatedText: "", audio: null });
+    }
+
+    const isWav = rawBuffer.slice(0, 4).toString("utf8") === "RIFF";
+    const wavBuffer = isWav ? rawBuffer : pcm16ToWavBuffer(rawBuffer, 16000);
+    const base64Wav = wavBuffer.toString("base64");
 
     const targetLangInfo = LANG_MAP[targetLang] || LANG_MAP["hi"];
     const targetLangName = targetLangInfo.name;
@@ -163,8 +191,8 @@ Return JSON matching strictly:
       contents: [
         {
           inlineData: {
-            data: audio,
-            mimeType: mimeType || "audio/pcm;rate=16000",
+            data: base64Wav,
+            mimeType: "audio/wav",
           },
         },
         { text: prompt },

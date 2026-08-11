@@ -34,6 +34,36 @@ export function base64ToInt16Float32(base64: string): Float32Array {
   return float32Array;
 }
 
+// Safely concatenate multiple Base64 Int16 PCM chunks into a single Base64 PCM string
+export function mergeBase64PCMChunks(chunks: string[]): string {
+  if (chunks.length === 0) return "";
+  try {
+    const byteArrays = chunks.map((c) => {
+      const binary = atob(c);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    });
+    const totalLength = byteArrays.reduce((acc, b) => acc + b.length, 0);
+    const combined = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const b of byteArrays) {
+      combined.set(b, offset);
+      offset += b.length;
+    }
+    let binary = "";
+    for (let i = 0; i < combined.length; i++) {
+      binary += String.fromCharCode(combined[i]);
+    }
+    return btoa(binary);
+  } catch (e) {
+    console.error("Error merging Base64 PCM chunks:", e);
+    return "";
+  }
+}
+
 /**
  * Real-time 16kHz PCM audio recorder from microphone or stream
  */
