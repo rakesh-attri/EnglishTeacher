@@ -1,0 +1,10 @@
+{
+  "name": "Live Voice Translator English Hindi",
+  "description": "Real-time bilingual speech and subtitle translation between English and Hindi powered by Google Gemini Live AI.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
