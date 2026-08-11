@@ -30,6 +30,14 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+const LANG_MAP: Record<string, { name: string; flag: string; voice: string }> = {
+  en: { name: "English (US)", flag: "🇺🇸", voice: "Puck" },
+  "en-GB": { name: "English (UK)", flag: "🇬🇧", voice: "Aoede" },
+  hi: { name: "Hindi (हिंदी)", flag: "🇮🇳", voice: "Kore" },
+  es: { name: "Spanish (Español)", flag: "🇪🇸", voice: "Fenrir" },
+  de: { name: "German (Deutsch)", flag: "🇩🇪", voice: "Charon" },
+};
+
 // Config route
 app.get("/api/config", (req, res) => {
   res.json({
@@ -37,11 +45,22 @@ app.get("/api/config", (req, res) => {
     fallbackLiveModel: "gemini-3.1-flash-live-preview",
     textModel: "gemini-3.6-flash",
     ttsModel: "gemini-3.1-flash-tts-preview",
-    supportedLanguages: [
-      { code: "en", name: "English", flag: "🇺🇸" },
-      { code: "hi", name: "Hindi (हिंदी)", flag: "🇮🇳" },
-    ],
+    supportedLanguages: Object.entries(LANG_MAP).map(([code, info]) => ({
+      code,
+      name: info.name,
+      flag: info.flag,
+    })),
   });
+});
+
+// Teams App Manifest Zip download route
+app.get("/VoxFlowLive-TeamsApp.zip", (req, res) => {
+  const zipPath = path.join(process.cwd(), "public", "VoxFlowLive-TeamsApp.zip");
+  res.download(zipPath, "VoxFlowLive-TeamsApp.zip");
+});
+app.get("/api/download-teams-app", (req, res) => {
+  const zipPath = path.join(process.cwd(), "public", "VoxFlowLive-TeamsApp.zip");
+  res.download(zipPath, "VoxFlowLive-TeamsApp.zip");
 });
 
 // Text translation API (REST fallback for quick phrase translation)
@@ -52,8 +71,8 @@ app.post("/api/translate/text", async (req, res) => {
       return res.status(400).json({ error: "Text is required" });
     }
 
-    const sourceLabel = sourceLang === "hi" ? "Hindi" : sourceLang === "en" ? "English" : "Auto-detected language";
-    const targetLabel = targetLang === "en" ? "English" : "Hindi";
+    const sourceLabel = LANG_MAP[sourceLang]?.name || "Auto-detected language";
+    const targetLabel = LANG_MAP[targetLang]?.name || "English";
 
     const prompt = `Translate the following speech transcript from ${sourceLabel} to natural, conversational ${targetLabel}.
 Maintain the speaker's context, tone, and intent. If technical terms like 'Salesforce', 'API', 'Zoom', 'process' are present, handle them naturally in colloquial language.
@@ -64,7 +83,7 @@ Return JSON matching:
 {
   "translatedText": "the translated string",
   "detectedSourceLang": "${sourceLang || "auto"}",
-  "phoneticPronunciation": "Devanagari or Romanized phonetic guide if relevant"
+  "phoneticPronunciation": "Phonetic or Romanized guide if relevant"
 }`;
 
     const response = await ai.models.generateContent({
@@ -92,8 +111,9 @@ app.post("/api/translate/tts", async (req, res) => {
       return res.status(400).json({ error: "Text is required" });
     }
 
-    const selectedVoice = voice || (language === "hi" ? "Kore" : "Puck");
-    const prompt = `Speak cleanly in ${language === "hi" ? "Hindi" : "English"}: ${text}`;
+    const targetLangInfo = LANG_MAP[language] || LANG_MAP["en"];
+    const selectedVoice = voice || targetLangInfo.voice;
+    const prompt = `Speak cleanly in ${targetLangInfo.name}: ${text}`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3.1-flash-tts-preview",
@@ -141,7 +161,7 @@ wss.on("connection", (clientWs: WebSocket) => {
   console.log("Client connected to /ws/translate");
 
   let liveSession: any = null;
-  let targetLang = "hi"; // default target: Hindi
+  let targetLang = "hi"; // default target
   let sourceLang = "auto";
   let isConnectedToGemini = false;
 
@@ -149,12 +169,13 @@ wss.on("connection", (clientWs: WebSocket) => {
     targetLang = configOptions.targetLang || targetLang;
     sourceLang = configOptions.sourceLang || sourceLang;
 
-    const targetLangName = targetLang === "hi" ? "Hindi (हिंदी)" : "English";
-    const voiceName = targetLang === "hi" ? "Kore" : "Puck";
+    const targetLangInfo = LANG_MAP[targetLang] || LANG_MAP["hi"];
+    const targetLangName = targetLangInfo.name;
+    const voiceName = targetLangInfo.voice;
 
-    const systemInstruction = `You are a real-time speech-to-speech interpreter for live video calls and meetings between English and Hindi speakers.
+    const systemInstruction = `You are a real-time speech-to-speech interpreter for live video calls and meetings between multilingual participants.
 Your primary task:
-- Listen to input audio (which may be in English or Hindi).
+- Listen to input audio in any spoken language (e.g. English, Hindi, Spanish, German).
 - Detect the spoken language.
 - Immediately translate the speaker's intent into ${targetLangName}.
 - Speak the translation out loud clearly in natural, fluent ${targetLangName}.

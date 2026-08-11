@@ -1,0 +1,60 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.manifest.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "c1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c",
+  "packageName": "com.voxflow.livetranslator",
+  "developer": {
+    "name": "VoxFlow AI",
+    "websiteUrl": "https://ais-pre-jcgczj4sdsfqoq2bclk3ef-590253023971.asia-southeast1.run.app",
+    "privacyUrl": "https://ais-pre-jcgczj4sdsfqoq2bclk3ef-590253023971.asia-southeast1.run.app",
+    "termsOfUseUrl": "https://ais-pre-jcgczj4sdsfqoq2bclk3ef-590253023971.asia-southeast1.run.app"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "VoxFlow Live",
+    "full": "VoxFlow Live \u2014 Real-time EN \u2194 HI Voice Translator"
+  },
+  "description": {
+    "short": "Live AI English \u2194 Hindi meeting translator and captions.",
+    "full": "Real-time AI voice translator and live subtitle captions powered by Google Gemini 3.5 Live API."
+  },
+  "accentColor": "#4F46E5",
+  "configurableTabs": [
+    {
+      "configurationUrl": "https://ais-pre-jcgczj4sdsfqoq2bclk3ef-590253023971.asia-southeast1.run.app",
+      "canUpdateConfiguration": true,
+      "scopes": [
+        "team",
+        "groupchat"
+      ]
+    }
+  ],
+  "staticTabs": [
+    {
+      "entityId": "voxflow_live_studio",
+      "name": "Live Translator",
+      "contentUrl": "https://ais-pre-jcgczj4sdsfqoq2bclk3ef-590253023971.asia-southeast1.run.app",
+      "scopes": [
+        "personal"
+      ]
+    }
+  ],
+  "meetingExtensionDefinition": {
+    "scenes": [],
+    "sidePanel": {
+      "contentUrl": "https://ais-pre-jcgczj4sdsfqoq2bclk3ef-590253023971.asia-southeast1.run.app"
+    }
+  },
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "ais-pre-jcgczj4sdsfqoq2bclk3ef-590253023971.asia-southeast1.run.app",
+    "*.run.app"
+  ]
+}

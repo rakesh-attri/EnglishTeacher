@@ -39,6 +39,48 @@ export const VirtualDeviceSetup: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+      {/* Microsoft Teams Custom App Package Banner */}
+      <div className="bg-gradient-to-r from-indigo-900 via-blue-900 to-indigo-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl space-y-4 border border-indigo-700/50">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 text-xs font-bold">
+              <Download className="w-3.5 h-3.5 text-indigo-300" />
+              <span>Microsoft Teams Native App Manifest</span>
+            </div>
+            <h3 className="text-xl font-bold tracking-tight">
+              Add VoxFlow Live to Microsoft Teams ("Added by your org")
+            </h3>
+            <p className="text-xs text-indigo-200 max-w-2xl leading-relaxed">
+              Download the pre-configured Microsoft Teams App Package (contains <code>manifest.json</code>, <code>color.png</code>, and <code>outline.png</code>). Upload it to Teams Developer Portal or Teams Admin to make it available under <strong>Apps → Added by your org</strong> or inside meeting side-panels!
+            </p>
+          </div>
+
+          <a
+            href="/VoxFlowLive-TeamsApp.zip"
+            download="VoxFlowLive-TeamsApp.zip"
+            className="inline-flex items-center justify-center space-x-2 px-5 py-3 rounded-2xl bg-white text-indigo-950 hover:bg-indigo-50 font-extrabold text-xs shadow-lg transition-all shrink-0 active:scale-95"
+          >
+            <Download className="w-4 h-4 text-indigo-600" />
+            <span>Download Teams App Package (.zip)</span>
+          </a>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 text-xs text-indigo-100">
+          <div className="bg-white/10 p-3 rounded-xl border border-white/10 space-y-1">
+            <p className="font-bold text-white">1. Download ZIP</p>
+            <p className="text-[11px] text-indigo-200">Get the <code>VoxFlowLive-TeamsApp.zip</code> package containing manifest and high-res icons.</p>
+          </div>
+          <div className="bg-white/10 p-3 rounded-xl border border-white/10 space-y-1">
+            <p className="font-bold text-white">2. Open Teams Apps</p>
+            <p className="text-[11px] text-indigo-200">Go to Teams → <strong>Apps</strong> → <strong>Developer Portal</strong> (or "Manage your apps" → "Submit an app").</p>
+          </div>
+          <div className="bg-white/10 p-3 rounded-xl border border-white/10 space-y-1">
+            <p className="font-bold text-white">3. Upload & Publish</p>
+            <p className="text-[11px] text-indigo-200">Upload the ZIP to publish it for your organization or side-panel in meeting calls!</p>
+          </div>
+        </div>
+      </div>
+
       {/* Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl space-y-4">
         <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-xs font-bold">

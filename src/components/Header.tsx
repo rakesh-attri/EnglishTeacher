@@ -78,7 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
                   Bilingual Voice Live
                 </h1>
                 <span className="text-[10px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200/60">
-                  EN ↔ HI
+                  Multilingual AI
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-medium">

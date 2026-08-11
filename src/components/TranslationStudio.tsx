@@ -103,9 +103,12 @@ export const TranslationStudio: React.FC<TranslationStudioProps> = ({
                   onChange={(e) => setSourceLang(e.target.value as LanguageCode)}
                   className="appearance-none bg-slate-100/80 border border-slate-300/80 text-slate-800 text-sm font-semibold rounded-xl px-4 py-2.5 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
                 >
-                  <option value="auto">🌐 Auto-Detect (EN / HI)</option>
-                  <option value="en">🇺🇸 English</option>
+                  <option value="auto">🌐 Auto-Detect Language</option>
+                  <option value="en">🇺🇸 English (US)</option>
+                  <option value="en-GB">🇬🇧 English (UK)</option>
                   <option value="hi">🇮🇳 Hindi (हिंदी)</option>
+                  <option value="es">🇪🇸 Spanish (Español)</option>
+                  <option value="de">🇩🇪 German (Deutsch)</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
                   <Globe className="w-4 h-4" />
@@ -138,7 +141,10 @@ export const TranslationStudio: React.FC<TranslationStudioProps> = ({
                   className="appearance-none bg-slate-100/80 border border-slate-300/80 text-slate-800 text-sm font-semibold rounded-xl px-4 py-2.5 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
                 >
                   <option value="hi">🇮🇳 Hindi (हिंदी)</option>
-                  <option value="en">🇺🇸 English</option>
+                  <option value="en">🇺🇸 English (US)</option>
+                  <option value="en-GB">🇬🇧 English (UK)</option>
+                  <option value="es">🇪🇸 Spanish (Español)</option>
+                  <option value="de">🇩🇪 German (Deutsch)</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
                   <Globe className="w-4 h-4" />

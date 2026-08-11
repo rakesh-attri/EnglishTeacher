@@ -1,4 +1,4 @@
-export type LanguageCode = "en" | "hi" | "auto";
+export type LanguageCode = "en" | "en-GB" | "hi" | "es" | "de" | "auto";
 
 export interface LanguageOption {
   code: LanguageCode;
