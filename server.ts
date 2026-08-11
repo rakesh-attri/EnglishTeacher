@@ -140,6 +140,82 @@ app.post("/api/translate/tts", async (req, res) => {
   }
 });
 
+// Audio REST Translation API (Fallback for Vercel & serverless environments without persistent WebSockets)
+app.post("/api/translate/audio", async (req, res) => {
+  try {
+    const { audio, mimeType, sourceLang, targetLang } = req.body;
+    if (!audio) {
+      return res.status(400).json({ error: "Audio data is required" });
+    }
+
+    const targetLangInfo = LANG_MAP[targetLang] || LANG_MAP["hi"];
+    const targetLangName = targetLangInfo.name;
+
+    const prompt = `You are a real-time speech interpreter. Listen to this input audio clip carefully. Translate what was spoken directly into ${targetLangName}. 
+Return JSON matching strictly:
+{
+  "sourceText": "transcription of what was spoken",
+  "translatedText": "the translated speech in ${targetLangName}"
+}`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.6-flash",
+      contents: [
+        {
+          inlineData: {
+            data: audio,
+            mimeType: mimeType || "audio/pcm;rate=16000",
+          },
+        },
+        { text: prompt },
+      ],
+      config: {
+        responseMimeType: "application/json",
+      },
+    });
+
+    const jsonText = response.text || "{}";
+    let result = { sourceText: "", translatedText: "" };
+    try {
+      result = JSON.parse(jsonText);
+    } catch {
+      result.translatedText = response.text || "";
+    }
+
+    // Synthesize TTS audio for output
+    let base64TTS = null;
+    if (result.translatedText) {
+      try {
+        const ttsPrompt = `Speak cleanly in ${targetLangName}: ${result.translatedText}`;
+        const ttsResponse = await ai.models.generateContent({
+          model: "gemini-3.1-flash-tts-preview",
+          contents: [{ parts: [{ text: ttsPrompt }] }],
+          config: {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: targetLangInfo.voice },
+              },
+            },
+          },
+        });
+        base64TTS = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
+      } catch (e) {
+        console.warn("TTS fallback generation warning:", e);
+      }
+    }
+
+    res.json({
+      sourceText: result.sourceText || "Spoken audio input",
+      translatedText: result.translatedText,
+      audio: base64TTS,
+    });
+  } catch (error: any) {
+    console.error("Audio REST translation error:", error);
+    res.status(500).json({ error: error.message || "Audio translation failed" });
+  }
+});
+
 // Create HTTP server
 const server = http.createServer(app);
 

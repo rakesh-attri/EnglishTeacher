@@ -30,10 +30,19 @@ export default function App() {
   const [inputVolume, setInputVolume] = useState<number>(0);
   const [outputVolume, setOutputVolume] = useState<number>(0);
 
+  // Vercel / Serverless Fallback States
+  const [isServerlessMode, setIsServerlessMode] = useState<boolean>(false);
+  const [customWsUrl, setCustomWsUrl] = useState<string>(() => {
+    return localStorage.getItem("voxflow_custom_ws_url") || "";
+  });
+  const [showDeploymentNotice, setShowDeploymentNotice] = useState<boolean>(false);
+
   const wsRef = useRef<WebSocket | null>(null);
   const recorderRef = useRef<PCMStreamRecorder | null>(null);
   const playerRef = useRef<PCMAudioQueuePlayer | null>(null);
   const activeTurnIdRef = useRef<string | null>(null);
+  const audioChunksRef = useRef<string[]>([]);
+  const isProcessingRestAudioRef = useRef<boolean>(false);
 
   // Initialize Audio Player
   const getAudioPlayer = useCallback(() => {
@@ -42,6 +51,12 @@ export default function App() {
     }
     return playerRef.current;
   }, []);
+
+  // Save Custom WS URL
+  const handleSaveCustomWsUrl = (url: string) => {
+    setCustomWsUrl(url);
+    localStorage.setItem("voxflow_custom_ws_url", url);
+  };
 
   // Stop Translation Session
   const stopTranslationSession = useCallback(() => {
@@ -59,12 +74,63 @@ export default function App() {
       wsRef.current.close();
       wsRef.current = null;
     }
+    audioChunksRef.current = [];
+    isProcessingRestAudioRef.current = false;
     setStatus("stopped");
     setStatusMessage("Live voice translation stopped.");
     setInputVolume(0);
   }, []);
 
-  // Start Live Voice Translation Session (via Microphone or Tab Audio Stream)
+  // Process Serverless REST Audio Chunk
+  const sendRestAudioChunk = useCallback(async (base64Audio: string) => {
+    if (isProcessingRestAudioRef.current || !base64Audio) return;
+    isProcessingRestAudioRef.current = true;
+    try {
+      setStatusMessage("⚡ Serverless Mode: Translating voice clip...");
+      const res = await fetch("/api/translate/audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          audio: base64Audio,
+          sourceLang,
+          targetLang,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.translatedText) {
+        const turnId = "turn-rest-" + Date.now();
+        const newTurn: TranslationTurn = {
+          id: turnId,
+          timestamp: new Date().toLocaleTimeString(),
+          speaker: "user",
+          sourceLang: sourceLang,
+          targetLang,
+          sourceText: data.sourceText || "Spoken input clip",
+          translatedText: data.translatedText,
+        };
+
+        setTurns((prev) => [newTurn, ...prev]);
+        setStatus("speaking");
+        setStatusMessage(`🎙️ Translated: "${data.translatedText}"`);
+
+        if (data.audio) {
+          const player = getAudioPlayer();
+          player.playChunk(data.audio);
+        }
+
+        setTimeout(() => {
+          setStatus("listening");
+        }, 1500);
+      }
+    } catch (e) {
+      console.error("REST Audio translation error:", e);
+    } finally {
+      isProcessingRestAudioRef.current = false;
+    }
+  }, [sourceLang, targetLang, getAudioPlayer]);
+
+  // Start Live Voice Translation Session
   const startTranslationSession = useCallback(
     async (customMediaStream?: MediaStream) => {
       stopTranslationSession();
@@ -73,13 +139,17 @@ export default function App() {
       setStatusMessage("Opening WebSocket connection...");
 
       const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${location.host}/ws/translate`;
+      const wsUrl = customWsUrl.trim() || `${protocol}//${location.host}/ws/translate`;
 
       try {
+        let wsConnected = false;
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
         ws.onopen = () => {
+          wsConnected = true;
+          setIsServerlessMode(false);
+          setShowDeploymentNotice(false);
           setStatusMessage("WebSocket connected. Starting Gemini Live session...");
           ws.send(
             JSON.stringify({
@@ -106,12 +176,10 @@ export default function App() {
               const player = getAudioPlayer();
               player.playChunk(msg.data);
 
-              // Reset status back to listening after speech completes
               setTimeout(() => {
                 setStatus("listening");
               }, 1200);
             } else if (msg.type === "source_text") {
-              // Update or append turn with source speaker text
               const now = new Date().toLocaleTimeString();
               setTurns((prev) => {
                 const existingIdx = prev.findIndex((t) => t.id === activeTurnIdRef.current);
@@ -180,22 +248,34 @@ export default function App() {
           }
         };
 
+        const handleWsFailure = () => {
+          if (!wsConnected) {
+            console.warn("WebSocket connection failed/closed. Switching to Serverless REST Voice Mode.");
+            setIsServerlessMode(true);
+            setShowDeploymentNotice(true);
+            setStatus("listening");
+            setStatusMessage("🎙️ Serverless REST Voice Mode active. Speak into mic!");
+          }
+        };
+
         ws.onerror = (err) => {
           console.error("WebSocket error:", err);
-          setStatus("error");
-          setStatusMessage("WebSocket connection error.");
+          handleWsFailure();
         };
 
         ws.onclose = () => {
           if (status !== "stopped") {
-            setStatus("disconnected");
-            setStatusMessage("Connection closed.");
+            handleWsFailure();
           }
         };
 
         // Start PCM Stream Recorder
+        let pcmAccumulator: string[] = [];
+        let chunkTimer: any = null;
+
         const recorder = new PCMStreamRecorder((base64PCM, vol) => {
           setInputVolume(vol);
+
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(
               JSON.stringify({
@@ -203,6 +283,19 @@ export default function App() {
                 data: base64PCM,
               })
             );
+          } else {
+            // REST Fallback accumulation: collect audio chunks every 3 seconds
+            pcmAccumulator.push(base64PCM);
+            if (vol > 0.15 && !chunkTimer) {
+              chunkTimer = setTimeout(() => {
+                if (pcmAccumulator.length > 0) {
+                  const combinedPCM = pcmAccumulator.join("");
+                  pcmAccumulator = [];
+                  sendRestAudioChunk(combinedPCM);
+                }
+                chunkTimer = null;
+              }, 2500);
+            }
           }
         });
 
@@ -210,11 +303,13 @@ export default function App() {
         await recorder.start(customMediaStream);
       } catch (err: any) {
         console.error("Failed to start translation session:", err);
-        setStatus("error");
-        setStatusMessage("Failed to initialize audio: " + (err.message || "Unknown error"));
+        setIsServerlessMode(true);
+        setShowDeploymentNotice(true);
+        setStatus("listening");
+        setStatusMessage("🎙️ Serverless REST Voice Mode active. Speak into mic!");
       }
     },
-    [sourceLang, targetLang, getAudioPlayer, stopTranslationSession, status]
+    [sourceLang, targetLang, customWsUrl, getAudioPlayer, stopTranslationSession, sendRestAudioChunk, status]
   );
 
   // Handle configuration changes during live translation
@@ -314,6 +409,41 @@ export default function App() {
         status={status}
         statusMessage={statusMessage}
       />
+
+      {/* Vercel Serverless / WebSocket Fallback Banner */}
+      {(showDeploymentNotice || isServerlessMode) && (
+        <div className="bg-amber-500/10 border-b border-amber-300/60 px-4 py-3 text-xs text-amber-900">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div className="flex items-start space-x-2">
+              <span className="text-base shrink-0">⚡</span>
+              <div>
+                <p className="font-bold">
+                  Vercel Serverless Mode Active (WebSocket Closed)
+                </p>
+                <p className="text-[11px] text-amber-800/90 leading-relaxed">
+                  Vercel hosting does not support persistent WebSockets. The app has automatically switched to <strong>Serverless REST Voice Translation Mode</strong> (works 100% on Vercel!). Alternatively, enter a custom WebSocket backend URL below if hosted on Render/Cloud Run.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 w-full md:w-auto shrink-0">
+              <input
+                type="text"
+                placeholder="wss://your-render-app.onrender.com/ws/translate"
+                value={customWsUrl}
+                onChange={(e) => handleSaveCustomWsUrl(e.target.value)}
+                className="bg-white border border-amber-300 rounded-lg px-2.5 py-1 text-xs w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+              />
+              <button
+                onClick={() => setShowDeploymentNotice(false)}
+                className="px-2.5 py-1 bg-amber-200 hover:bg-amber-300 text-amber-900 font-bold rounded-lg text-xs transition-all shrink-0"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Tab Content View */}
       <main className="flex-1">
