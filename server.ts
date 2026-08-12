@@ -1,6 +1,7 @@
 import express from "express";
 import http from "http";
 import path from "path";
+import fs from "fs";
 import { WebSocket, WebSocketServer } from "ws";
 import { GoogleGenAI, Modality } from "@google/genai";
 import dotenv from "dotenv";
@@ -9,7 +10,7 @@ dotenv.config();
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = process.env.NODE_ENV === "production" ? (Number(process.env.PORT) || 3000) : 3000;
 
 // Shared Gemini AI instance
 const ai = new GoogleGenAI({
@@ -54,13 +55,19 @@ app.get("/api/config", (req, res) => {
 });
 
 // Teams App Manifest Zip download route
+const getTeamsZipPath = () => {
+  const p1 = path.join(process.cwd(), "public", "VoxFlowLive-TeamsApp.zip");
+  if (fs.existsSync(p1)) return p1;
+  const p2 = path.join(process.cwd(), "dist", "VoxFlowLive-TeamsApp.zip");
+  if (fs.existsSync(p2)) return p2;
+  return p1;
+};
+
 app.get("/VoxFlowLive-TeamsApp.zip", (req, res) => {
-  const zipPath = path.join(process.cwd(), "public", "VoxFlowLive-TeamsApp.zip");
-  res.download(zipPath, "VoxFlowLive-TeamsApp.zip");
+  res.download(getTeamsZipPath(), "VoxFlowLive-TeamsApp.zip");
 });
 app.get("/api/download-teams-app", (req, res) => {
-  const zipPath = path.join(process.cwd(), "public", "VoxFlowLive-TeamsApp.zip");
-  res.download(zipPath, "VoxFlowLive-TeamsApp.zip");
+  res.download(getTeamsZipPath(), "VoxFlowLive-TeamsApp.zip");
 });
 
 // Text translation API (REST fallback for quick phrase translation)
@@ -553,19 +560,26 @@ Your primary task:
 });
 
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV === "production") {
+    const cwdDist = path.join(process.cwd(), "dist");
+    const dirnameDist = __dirname;
+    const distPath = fs.existsSync(path.join(cwdDist, "index.html"))
+      ? cwdDist
+      : (fs.existsSync(path.join(dirnameDist, "index.html")) ? dirnameDist : cwdDist);
+
+    console.log(`[Production] Serving static app bundle from ${distPath}`);
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  } else {
+    console.log("[Development] Starting Vite middleware on port 3000...");
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
   }
 
   server.listen(PORT, "0.0.0.0", () => {
