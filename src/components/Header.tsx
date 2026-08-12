@@ -29,36 +29,41 @@ export const Header: React.FC<HeaderProps> = ({
       case "listening":
       case "connected":
         return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 animate-pulse">
-            <span className="w-2 h-2 mr-1.5 rounded-full bg-emerald-500 animate-ping" />
-            Live Translating
-          </span>
+          <div className="w-[185px] h-8 flex items-center justify-center px-3 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all duration-200 shrink-0">
+            <span className="relative flex h-2 w-2 mr-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="truncate whitespace-nowrap">Live Translating</span>
+          </div>
         );
       case "speaking":
         return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-            <Volume2 className="w-3.5 h-3.5 mr-1 animate-bounce" />
-            Playing Translated Voice
-          </span>
+          <div className="w-[185px] h-8 flex items-center justify-center px-3 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 transition-all duration-200 shrink-0">
+            <Volume2 className="w-3.5 h-3.5 mr-1.5 shrink-0 text-indigo-500" />
+            <span className="truncate whitespace-nowrap">Playing Translation</span>
+          </div>
         );
       case "connecting":
         return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-            <Zap className="w-3.5 h-3.5 mr-1 animate-spin" />
-            Connecting Gemini Live...
-          </span>
+          <div className="w-[185px] h-8 flex items-center justify-center px-3 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 transition-all duration-200 shrink-0">
+            <Zap className="w-3.5 h-3.5 mr-1.5 shrink-0 animate-spin text-amber-500" />
+            <span className="truncate whitespace-nowrap">Connecting Gemini...</span>
+          </div>
         );
       case "error":
         return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
-            Connection Alert
-          </span>
+          <div className="w-[185px] h-8 flex items-center justify-center px-3 rounded-full text-xs font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 transition-all duration-200 shrink-0">
+            <span className="w-2 h-2 mr-2 rounded-full bg-red-500 shrink-0" />
+            <span className="truncate whitespace-nowrap">Connection Alert</span>
+          </div>
         );
       default:
         return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
-            Ready
-          </span>
+          <div className="w-[185px] h-8 flex items-center justify-center px-3 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 transition-all duration-200 shrink-0">
+            <span className="w-2 h-2 mr-2 rounded-full bg-slate-400 shrink-0" />
+            <span className="truncate whitespace-nowrap">Ready</span>
+          </div>
         );
     }
   };
