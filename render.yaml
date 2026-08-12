@@ -1,8 +1,7 @@
-type: web
 services:
   - type: web
     name: voxflow-bilingual-voice-live
-    env: node
+    runtime: node
     plan: free
     buildCommand: npm install && npm run build
     startCommand: npm start
