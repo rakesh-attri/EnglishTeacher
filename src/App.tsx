@@ -290,6 +290,14 @@ export default function App() {
         const recorder = new PCMStreamRecorder((base64PCM, vol) => {
           setInputVolume(vol);
 
+          // Echo Isolation Guard: Ignore mic audio while translated speech output is playing to prevent feedback loops
+          if (playerRef.current && playerRef.current.getIsPlaying()) {
+            pcmAccumulator = [];
+            speechActive = false;
+            silenceCount = 0;
+            return;
+          }
+
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(
               JSON.stringify({

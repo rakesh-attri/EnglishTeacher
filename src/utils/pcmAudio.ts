@@ -97,7 +97,17 @@ export class PCMStreamRecorder {
       sampleRate: 16000,
     });
 
-    this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
+    if (this.audioContext.state === "suspended") {
+      await this.audioContext.resume();
+    }
+
+    const audioTracks = this.mediaStream.getAudioTracks();
+    if (audioTracks.length === 0) {
+      throw new Error("No active audio track found in the provided media stream.");
+    }
+    const audioOnlyStream = new MediaStream([audioTracks[0]]);
+    this.sourceNode = this.audioContext.createMediaStreamSource(audioOnlyStream);
+
     // 2048 buffer size gives ~128ms chunks at 16kHz for smooth streaming
     this.scriptProcessor = this.audioContext.createScriptProcessor(2048, 1, 1);
 
@@ -117,7 +127,11 @@ export class PCMStreamRecorder {
     };
 
     this.sourceNode.connect(this.scriptProcessor);
-    this.scriptProcessor.connect(this.audioContext.destination);
+    // Connect to silent GainNode to prevent audio feedback loop while driving onaudioprocess
+    const silentGain = this.audioContext.createGain();
+    silentGain.gain.value = 0;
+    this.scriptProcessor.connect(silentGain);
+    silentGain.connect(this.audioContext.destination);
   }
 
   stop(): void {
@@ -199,6 +213,10 @@ export class PCMAudioQueuePlayer {
         this.isPlaying = false;
       }
     };
+  }
+
+  getIsPlaying(): boolean {
+    return this.isPlaying || this.activeSources.length > 0;
   }
 
   stopAll(): void {

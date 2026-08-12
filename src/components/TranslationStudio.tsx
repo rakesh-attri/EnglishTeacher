@@ -86,6 +86,46 @@ export const TranslationStudio: React.FC<TranslationStudioProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* Bidirectional Isolated Channels Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-5 text-white shadow-md border border-indigo-500/20 space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-indigo-500/20 pb-3">
+          <div className="flex items-center space-x-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <h2 className="text-sm font-bold tracking-wide uppercase text-indigo-200">
+              Isolated Two-Way Bidirectional Translation Flow
+            </h2>
+          </div>
+          <div className="flex items-center space-x-2 text-[11px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full">
+            <Check className="w-3.5 h-3.5" />
+            <span>Echo & Self-Feedback Loop Suppression Active</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Direction 1: English -> Spanish */}
+          <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-1.5">
+            <div className="flex items-center justify-between text-xs font-bold text-indigo-300">
+              <span>Channel 1: You → Remote Listener</span>
+              <span className="text-[10px] bg-indigo-500/20 px-2 py-0.5 rounded text-indigo-200">Outbound</span>
+            </div>
+            <p className="text-xs text-slate-300 font-medium">
+              You speak <strong className="text-white">English</strong> ➔ Translated to <strong className="text-amber-300">Spanish</strong> output for remote listener.
+            </p>
+          </div>
+
+          {/* Direction 2: Spanish -> English */}
+          <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-1.5">
+            <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
+              <span>Channel 2: Remote Speaker → You</span>
+              <span className="text-[10px] bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-200">Inbound</span>
+            </div>
+            <p className="text-xs text-slate-300 font-medium">
+              They speak <strong className="text-amber-300">Spanish</strong> ➔ Translated to <strong className="text-white">English</strong> audio in your speaker.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Top Banner Control Panel */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
